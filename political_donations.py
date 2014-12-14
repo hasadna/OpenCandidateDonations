@@ -35,7 +35,18 @@ def get_lm_donations():
     lm_url = r"https://statements.mevaker.gov.il/Handler/GuarantyDonationPublisherHandler.ashx"
 
     for i in range(200):
-        lm_data = {"PublicationSearchType":"1","EntityID":"","GD_Name":"","CityID":"","CountryID":"","FromDate":"","ToDate":"","FromSum":"","ToSum":"","localElectionId":"","localElectionCityID":str(i),"ID":None,"State":0,
+        lm_data = {"PublicationSearchType":"1",
+                   "EntityID":"",
+                   "GD_Name":"",
+                   "CityID":"",
+                   "CountryID":"",
+                   "FromDate":"",
+                   "ToDate":"",
+                   "FromSum":"",
+                   "ToSum":"",
+                   "localElectionId":"",
+                   "localElectionCityID":str(i),
+                   "ID":None,"State":0,
                    "URL":None,"IsControl":False,"IsUpdate":False}
         lm_data = json.dumps(lm_data)
         lm_data = "action=lgds&d=%s" % urllib.quote(lm_data)
@@ -62,6 +73,63 @@ def get_lm_donations():
             recs.append(rec)
 
         print "%d Local Municipalities: %d entries" % (i,len(lm_recs))
+
+def get_new_primary_donations():
+    np_recs = []
+
+    # Local Municipalities
+    np_url = r"https://statements.mevaker.gov.il/Handler/GuarantyDonationPublisherHandler.ashx"
+
+    for i in range(500):
+        np_data = { "PartyID":None,
+                    "EntityID":"%d" % i,
+                    "EntityTypeID":1,
+                    "PublicationSearchType":"1",
+                    "GD_Name":"",
+                    "CityID":"",
+                    "CountryID":"",
+                    "FromDate":"",
+                    "ToDate":"",
+                    "FromSum":"",
+                    "ToSum":"",
+                    "ID":None,
+                    "State":0,
+                    "URL":None,
+                    "IsControl":False,
+                    "IsUpdate":False}
+
+        np_data = json.dumps(np_data)
+        np_data = "action=gds&d=%s" % urllib.quote(np_data)
+
+        np = json.loads(geturl(np_url,np_data))
+        assert(len(np[0])<1000)
+        for x in np[0]:
+            foreign = x["SumInCurrency"].split(' ')
+            if len(foreign)>1:
+                foreign_sum = float(foreign[0])
+                foreign_currency = foreign[1]
+            else:
+                foreign_sum = None
+                foreign_currency = None
+
+            rec = {
+                "election_kind": "primaries",
+                "donor_city": string.capwords(x["City"]),
+                "donor_country": x["Country"],
+                "donor_location": string.capwords(x["City"])+" "+x["Country"],
+                "donation_receiver": x["CandidateName"],
+                "election_faction": x["Party"],
+                "donor_name": string.capwords(x["GD_Name"]),
+                "donation_date": datetime.datetime.fromtimestamp(int(x["GD_Date"][6:-2])/1000).strftime("%d/%m/%Y"),
+                "donation_sum": float(x["GD_Sum"]),
+                "donation_kind": x["GuaranteeOrDonation"],
+                "currency_id": foreign_currency,
+                "foreign_currency_sum": foreign_sum,
+            }
+            np_recs.append(rec)
+            recs.append(rec)
+
+        print "%d New Primaries: %d entries" % (i,len(np_recs))
 
 # Primaries
 def get_primary_donations():
@@ -118,6 +186,7 @@ def get_primary_donations():
             print "Primaries %s/%s: %d entries so far" % (party_name,candidate_name,len(pr_recs))
 
 get_primary_donations()
+get_new_primary_donations()
 get_lm_donations()
 
 out=file("donations.jsons","w")
